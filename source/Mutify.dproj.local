@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2019/12/10 14:56:46.000.148,=D:\Documenti\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2019/12/10 15:04:19.000.426,D:\Desktop\mutify\Unit1.pas=D:\Documenti\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2019/12/10 15:04:19.000.426,D:\Desktop\mutify\Unit1.dfm=D:\Documenti\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>2019/12/10 15:04:20.000.636,D:\Desktop\mutify\Project1.dproj=D:\Documenti\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
+    <Transaction>2019/12/10 21:42:51.000.975,D:\Desktop\mutify\Unit1.pas=D:\Desktop\mutify\uMainForm.pas</Transaction>
+    <Transaction>2019/12/10 21:42:51.000.975,D:\Desktop\mutify\Unit1.dfm=D:\Desktop\mutify\uMainForm.dfm</Transaction>
+    <Transaction>2019/12/10 21:43:23.000.720,D:\Desktop\mutify\Project1.dproj=D:\Desktop\mutify\Mutify.dproj</Transaction>
+    <Transaction>2019/12/10 22:18:25.000.127,=D:\Desktop\mutify\uMutify.pas</Transaction>
+  </Transactions>
+</BorlandProject>
