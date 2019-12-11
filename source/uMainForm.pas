@@ -62,19 +62,29 @@ begin
 end;
 
 procedure TMainForm.TimerTimer(Sender: TObject);
+var
+  CurrentVolume: Single;
 begin
+
   if (FStatus <> stMuted) then
     FStatus := stUnknown;
 
   EnumWindows(@ProcessWindows, LParam(Self));
   if (FStatus = stFound) then
   begin
-    FVolume := GetMasterVolume();
+    CurrentVolume := GetMasterVolume();
+    if (CurrentVolume > 0) then
+      FVolume := CurrentVolume;
+
     SetMasterVolume(0);
     FStatus := stMuted;
   end
   else if (FStatus = stMuted) then
+  begin
     SetMasterVolume(FVolume);
+    FStatus := stUnknown;
+  end;
+
 end;
 
 end.
