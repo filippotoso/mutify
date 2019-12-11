@@ -8,7 +8,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, strutils, Vcl.ExtCtrls;
 
 type
-  TStatus = (stUnknown, stFound, stNotFound, stMuted);
+  TStatus = (stUnknown, stFound, stMuted);
 
   TMainForm = class(TForm)
     Timer: TTimer;
@@ -58,16 +58,18 @@ end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  FVolume := 1;
+  FVolume := GetMasterVolume();
 end;
 
 procedure TMainForm.TimerTimer(Sender: TObject);
 begin
-  FStatus := stUnknown;
+  if (FStatus <> stMuted) then
+    FStatus := stUnknown;
+
   EnumWindows(@ProcessWindows, LParam(Self));
   if (FStatus = stFound) then
   begin
-    FVolume := GetMasterVolume;
+    FVolume := GetMasterVolume();
     SetMasterVolume(0);
     FStatus := stMuted;
   end
