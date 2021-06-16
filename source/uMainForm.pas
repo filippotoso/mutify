@@ -5,22 +5,29 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, strutils, Vcl.ExtCtrls;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, strutils, Vcl.ExtCtrls,
+  Winapi.ActiveX;
+
+const SpotifyExecutable = '\Spotify.exe';
 
 type
   TStatus = (stUnknown, stFound, stMuted);
 
   TMainForm = class(TForm)
     Timer: TTimer;
-    procedure FormCreate(Sender: TObject);
     procedure TimerTimer(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
     FStatus: TStatus;
-    FVolume: Single;
+    FSpotifyHandle: THandle;
+    procedure Mute();
+    procedure Unmute();
     { Private declarations }
   public
     { Public declarations }
     property Status: TStatus read FStatus write FStatus;
+    property SpotifyHandle: THandle read FSpotifyHandle write FSpotifyHandle;
   end;
 
 var
@@ -32,6 +39,12 @@ implementation
 
 uses uMutify;
 
+var
+  AudioEndpoints: IMMDeviceEnumerator;
+  Speakers: IMMDevice;
+  SessionManager: IAudioSessionManager2;
+  GroupingString: string;
+
 function ProcessWindows(wHnd: THandle; Form: TMainForm): Bool; stdcall;
 var
   WindowName, WindowTitle: array [0 .. 255] of char;
@@ -39,6 +52,7 @@ var
   info: TWindowInfo;
 begin
   Result := True;
+  Form.SpotifyHandle := 0;
 
   if IsWindow(wHnd) then
   begin
@@ -48,43 +62,174 @@ begin
       GetWindowText(wHnd, WindowTitle, 255);
       if (WindowTitle <> '') then
       begin
-        if (WindowTitle = 'Advertisement') then
+        if (WindowTitle = 'Advertisement') or (WindowTitle = 'Spotify') or
+          (WindowTitle = 'Spotify Free') then
+        begin
           Form.Status := stFound;
+          Form.SpotifyHandle := wHnd;
+        end;
         Result := False;
       end;
     end;
   end;
 end;
 
-procedure TMainForm.FormCreate(Sender: TObject);
-begin
-  FVolume := GetMasterVolume();
-end;
-
 procedure TMainForm.TimerTimer(Sender: TObject);
 var
   CurrentVolume: Single;
+  WindowTitle: array [0 .. 255] of char;
 begin
-
-  if (FStatus <> stMuted) then
-    FStatus := stUnknown;
-
-  EnumWindows(@ProcessWindows, LParam(Self));
-  if (FStatus = stFound) then
+  if IsWindow(FSpotifyHandle) then
   begin
-    CurrentVolume := GetMasterVolume();
-    if (CurrentVolume > 0) then
-      FVolume := CurrentVolume;
-
-    SetMasterVolume(0);
-    FStatus := stMuted;
+    if (FStatus = stMuted) then
+    begin
+      GetWindowText(FSpotifyHandle, WindowTitle, 255);
+      if (WindowTitle <> 'Advertisement') and (WindowTitle <> 'Spotify') and
+        (WindowTitle <> 'Spotify Free') then
+        Unmute;
+    end
+    else
+    begin
+      GetWindowText(FSpotifyHandle, WindowTitle, 255);
+      if (WindowTitle = 'Advertisement') or (WindowTitle = 'Spotify') or
+        (WindowTitle = 'Spotify Free') then
+        Mute();
+    end;
   end
-  else if (FStatus = stMuted) then
+  else
   begin
-    SetMasterVolume(FVolume);
-    FStatus := stUnknown;
+    EnumWindows(@ProcessWindows, LParam(Self));
+    if (FStatus = stFound) then
+      Mute();
   end;
+end;
 
+procedure TMainForm.FormCreate(Sender: TObject);
+var
+  HR: HResult;
+begin
+  HR := CoCreateInstance(CLSID_MMDeviceEnumerator, nil, CLSCTX_INPROC_SERVER,
+    IID_IMMDeviceEnumerator, AudioEndpoints);
+  HR := AudioEndpoints.GetDefaultAudioEndpoint(0, 1, Speakers);
+  HR := Speakers.Activate(IID_IAudioSessionManager2, 0, nil, SessionManager);
+
+  if HR <> S_OK then
+  begin
+    // ShowMessage('Soemthing wrong here');
+  end;
+end;
+
+procedure TMainForm.Mute;
+var
+  SessionEnumerator: IAudioSessionEnumerator;
+  SessionCount: integer;
+  SessionControl: IAudioSessionControl;
+  SessionControl2: IAudioSessionControl2;
+  SimpleAudioVolume: ISimpleAudioVolume;
+  SessionName: PWideChar;
+  IconPath: PWideChar;
+  SessionIdentifier: PWideChar;
+  Grouping: TGUID;
+  Context: TGUID;
+  i: integer;
+begin
+  SessionManager.GetSessionEnumerator(SessionEnumerator);
+  SessionEnumerator.GetCount(SessionCount);
+  Context := GUID_NULL;
+
+  for i := 0 to SessionCount - 1 do
+  begin
+    SessionEnumerator.GetSession(i, SessionControl);
+    if SessionControl <> nil then
+    begin
+      SessionControl.GetIconPath(IconPath);
+      SessionControl.GetDisplayName(SessionName);
+      SessionControl.GetGroupingParam(Grouping);
+
+      SessionControl.QueryInterface(IID_IAudioSessionControl2, SessionControl2);
+      SessionControl2.GetSessionInstanceIdentifier(SessionIdentifier);
+
+      if Pos(SpotifyExecutable, SessionIdentifier) > 0 then
+      begin
+        SessionControl.QueryInterface(IID_ISimpleAudioVolume,
+          SimpleAudioVolume);
+        if SimpleAudioVolume <> nil then
+        begin
+          SimpleAudioVolume.SetMute(True, Context);
+          SimpleAudioVolume := nil;
+          FStatus := stMuted;
+        end;
+      end;
+
+      CoTaskMemFree(IconPath);
+      CoTaskMemFree(SessionName);
+      CoTaskMemFree(SessionIdentifier);
+      SessionControl2 := nil;
+      SessionControl := nil;
+    end;
+  end;
+  SessionEnumerator := nil;
+end;
+
+procedure TMainForm.Unmute;
+var
+  SessionEnumerator: IAudioSessionEnumerator;
+  SessionCount: integer;
+  SessionControl: IAudioSessionControl;
+  SessionControl2: IAudioSessionControl2;
+  SimpleAudioVolume: ISimpleAudioVolume;
+  SessionName: PWideChar;
+  IconPath: PWideChar;
+  SessionIdentifier: PWideChar;
+  Grouping: TGUID;
+  Context: TGUID;
+  i: integer;
+begin
+  // TODO: Unmute Google Chrome in Windows mixer
+  SessionManager.GetSessionEnumerator(SessionEnumerator);
+  SessionEnumerator.GetCount(SessionCount);
+  Context := GUID_NULL;
+
+  for i := 0 to SessionCount - 1 do
+  begin
+    SessionEnumerator.GetSession(i, SessionControl);
+    if SessionControl <> nil then
+    begin
+      SessionControl.GetIconPath(IconPath);
+      SessionControl.GetDisplayName(SessionName);
+      SessionControl.GetGroupingParam(Grouping);
+
+      SessionControl.QueryInterface(IID_IAudioSessionControl2, SessionControl2);
+      SessionControl2.GetSessionInstanceIdentifier(SessionIdentifier);
+
+      if Pos(SpotifyExecutable, SessionIdentifier) > 0 then
+      begin
+        SessionControl.QueryInterface(IID_ISimpleAudioVolume,
+          SimpleAudioVolume);
+        if SimpleAudioVolume <> nil then
+        begin
+          SimpleAudioVolume.SetMute(False, Context);
+          SimpleAudioVolume := nil;
+          FStatus := stUnknown;
+        end;
+      end;
+
+      CoTaskMemFree(IconPath);
+      CoTaskMemFree(SessionName);
+      CoTaskMemFree(SessionIdentifier);
+      SessionControl2 := nil;
+      SessionControl := nil;
+    end;
+  end;
+  SessionEnumerator := nil;
+end;
+
+
+procedure TMainForm.FormDestroy(Sender: TObject);
+begin
+  SessionManager := nil;
+  Speakers := nil;
+  AudioEndpoints := nil;
 end;
 
 end.

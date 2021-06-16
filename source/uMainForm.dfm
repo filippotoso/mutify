@@ -485,10 +485,10 @@ object MainForm: TMainForm
     0000E0070000F81F0000FFFF0000}
   OldCreateOrder = False
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object Timer: TTimer
-    Interval = 250
     OnTimer = TimerTimer
     Left = 16
     Top = 8
