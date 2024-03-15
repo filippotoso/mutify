@@ -45,6 +45,12 @@ var
   SessionManager: IAudioSessionManager2;
   GroupingString: string;
 
+
+function isAdvertising(WindowTitle: String): Bool;
+begin
+  Result := not AnsiContainsText(WindowTitle, '-'); // Author - Song
+end;
+
 function ProcessWindows(wHnd: THandle; Form: TMainForm): Bool; stdcall;
 var
   WindowName, WindowTitle: array [0 .. 255] of char;
@@ -57,13 +63,12 @@ begin
   if IsWindow(wHnd) then
   begin
     GetClassName(wHnd, WindowName, 255);
-    if (WindowName = 'Chrome_WidgetWin_0') then
+    if (AnsiStartsText('Chrome_Widget', WindowName)) then
     begin
       GetWindowText(wHnd, WindowTitle, 255);
       if (WindowTitle <> '') then
       begin
-        if (WindowTitle = 'Advertisement') or (WindowTitle = 'Spotify') or
-          (WindowTitle = 'Spotify Free') then
+        if isAdvertising(WindowTitle) then
         begin
           Form.Status := stFound;
           Form.SpotifyHandle := wHnd;
@@ -84,15 +89,13 @@ begin
     if (FStatus = stMuted) then
     begin
       GetWindowText(FSpotifyHandle, WindowTitle, 255);
-      if (WindowTitle <> 'Advertisement') and (WindowTitle <> 'Spotify') and
-        (WindowTitle <> 'Spotify Free') then
+      if not isAdvertising(WindowTitle) then
         Unmute;
     end
     else
     begin
       GetWindowText(FSpotifyHandle, WindowTitle, 255);
-      if (WindowTitle = 'Advertisement') or (WindowTitle = 'Spotify') or
-        (WindowTitle = 'Spotify Free') then
+      if isAdvertising(WindowTitle) then
         Mute();
     end;
   end
