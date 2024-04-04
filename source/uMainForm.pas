@@ -6,9 +6,10 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, strutils, Vcl.ExtCtrls,
-  Winapi.ActiveX;
+  Winapi.ActiveX, TlHelp32;
 
-const SpotifyExecutable = '\Spotify.exe';
+const
+  SpotifyExecutable = '\Spotify.exe';
 
 type
   TStatus = (stUnknown, stFound, stMuted);
@@ -45,10 +46,48 @@ var
   SessionManager: IAudioSessionManager2;
   GroupingString: string;
 
-
 function isAdvertising(WindowTitle: String): Bool;
 begin
   Result := not AnsiContainsText(WindowTitle, '-'); // Author - Song
+end;
+
+function ExeFromHandle(wHnd: THandle): String;
+var
+  Snap: THandle;
+  Pe: tagPROCESSENTRY32;
+  Pid: THandle;
+  Found: Boolean;
+begin
+  Result := '';
+
+  if (wHnd = 0) then
+    Exit;
+
+  Snap := TlHelp32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+  if (Snap = Cardinal(-1)) then
+    Exit;
+
+  GetWindowThreadProcessId(wHnd, @Pid);
+  Pe.dwSize := Sizeof(Pe);
+  Found := TlHelp32.Process32First(Snap, Pe);
+
+  while Found do
+  begin
+    if (Pe.th32ProcessID = Pid) then
+    begin
+      Result := String(Pe.szExeFile);
+      Break;
+    end;
+    Found := TlHelp32.Process32Next(Snap, Pe);
+  end;
+
+  CloseHandle(Snap);
+end;
+
+function isSpotify(wHnd: THandle): Bool;
+begin
+  Result := ExeFromHandle(wHnd) = 'Spotify.exe';
 end;
 
 function ProcessWindows(wHnd: THandle; Form: TMainForm): Bool; stdcall;
@@ -68,12 +107,12 @@ begin
       GetWindowText(wHnd, WindowTitle, 255);
       if (WindowTitle <> '') then
       begin
-        if isAdvertising(WindowTitle) then
+        if isSpotify(wHnd) and isAdvertising(WindowTitle) then
         begin
           Form.Status := stFound;
           Form.SpotifyHandle := wHnd;
+          Result := False;
         end;
-        Result := False;
       end;
     end;
   end;
@@ -118,8 +157,10 @@ begin
 
   if HR <> S_OK then
   begin
-    // ShowMessage('Soemthing wrong here');
+    ShowMessage('Soemthing wrong here');
   end;
+
+  Unmute();
 end;
 
 procedure TMainForm.Mute;
@@ -158,7 +199,7 @@ begin
           SimpleAudioVolume);
         if SimpleAudioVolume <> nil then
         begin
-          SimpleAudioVolume.SetMute(True, Context);
+          SimpleAudioVolume.SetMute(true, Context);
           SimpleAudioVolume := nil;
           FStatus := stMuted;
         end;
@@ -188,7 +229,6 @@ var
   Context: TGUID;
   i: integer;
 begin
-  // TODO: Unmute Google Chrome in Windows mixer
   SessionManager.GetSessionEnumerator(SessionEnumerator);
   SessionEnumerator.GetCount(SessionCount);
   Context := GUID_NULL;
@@ -226,7 +266,6 @@ begin
   end;
   SessionEnumerator := nil;
 end;
-
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
